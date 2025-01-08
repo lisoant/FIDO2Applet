@@ -22,7 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class AppletBasicTest {
 
     CardSimulator simulator;
-    AID appletAID = AIDUtil.create("F000000001");
+    AID appletAID = AIDUtil.create("A0000006472F0001");
+    AID randoAID = AIDUtil.create("F100900001");
+    AID randoLongAID = AIDUtil.create("F100900001AAAAAAAAAAAA");
 
     @BeforeEach
     public void setupApplet() {
@@ -42,14 +44,9 @@ public class AppletBasicTest {
         return sendCTAP(bparams);
     }
 
-    private ResponseAPDU send(int... params) {
-        byte[] bparams = new byte[params.length];
-        for (int i = 0; i < params.length; i++) {
-            bparams[i] = (byte) params[i];
-        }
+    private ResponseAPDU send(byte[] bparams) {
         CommandAPDU commandAPDU = new CommandAPDU(bparams);
         ResponseAPDU response = simulator.transmitCommand(commandAPDU);
-
 
         ArrayList<ResponseAPDU> prevResponses = new ArrayList<>();
         int totalResponseLen = response.getNr();
@@ -77,6 +74,15 @@ public class AppletBasicTest {
         combinedBB[off++] = (byte) lastResponse.getSW2();
 
         return new ResponseAPDU(combinedBB);
+    }
+
+    private ResponseAPDU send(int... params) {
+        byte[] bparams = new byte[params.length];
+        for (int i = 0; i < params.length; i++) {
+            bparams[i] = (byte) params[i];
+        }
+
+        return send(bparams);
     }
 
     private ResponseAPDU sendCTAP(int... vals) {
@@ -148,6 +154,28 @@ public class AppletBasicTest {
         byte[] respWithoutStatus = new byte[resp.length-2];
         System.arraycopy(resp, 0, respWithoutStatus, 0, resp.length-2);
         assertEquals("FIDO_2_0", new String(respWithoutStatus));
+    }
+
+    @Test
+    public void checkIgnoreSelectingIncorrectAID() {
+        byte[] resp = simulator.selectAppletWithResult(appletAID);
+        short recvdStatus = (short) (resp[resp.length - 2] * 256 + resp[resp.length - 1]);
+
+        assertEquals(ISO7816.SW_NO_ERROR, recvdStatus);
+
+        ResponseAPDU responseAPDU = send(AIDUtil.select(randoAID));
+        assertEquals(ISO7816.SW_FILE_NOT_FOUND, responseAPDU.getSW());
+    }
+
+    @Test
+    public void checkIgnoreSelectingIncorrectLongAID() {
+        byte[] resp = simulator.selectAppletWithResult(appletAID);
+        short recvdStatus = (short) (resp[resp.length - 2] * 256 + resp[resp.length - 1]);
+
+        assertEquals(ISO7816.SW_NO_ERROR, recvdStatus);
+
+        ResponseAPDU responseAPDU = send(AIDUtil.select(randoLongAID));
+        assertEquals(ISO7816.SW_FILE_NOT_FOUND, responseAPDU.getSW());
     }
 
 }
